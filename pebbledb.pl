@@ -46,8 +46,12 @@ sub GetAll{
         my $author = $_->{'author'};
         my $category = $_->{'category_name'};
         my $description = $_->{'description'};
-        my $screenshoti = $_->{'screenshot_images'}[0];
-        my $screenshot = (values %$screenshoti)[0];
+        my $screenshoti = $_->{'screenshot_images'};
+        my $screenshot = "";
+        if (ref($screenshoti) eq "ARRAY") {
+            my $screenshota = @$screenshoti[0];
+            $screenshot = (values %$screenshota)[0];
+        }
         my $capabilities = "";
         my $cap = $_->{'capabilities'};
         if (defined $cap) {
