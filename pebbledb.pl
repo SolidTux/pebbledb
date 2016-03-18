@@ -9,6 +9,8 @@ use DBI;
 use Encode qw(encode decode);
 use Getopt::Long;
 
+Getopt::Long::Configure ('bundling');
+
 my $appurl = "https://api2.getpebble.com/v2/apps/collection/all/watchapps-and-companions";
 my $faceurl = "https://api2.getpebble.com/v2/apps/collection/all/watchfaces";
 my $dbfile = "pebble.db";
@@ -16,7 +18,6 @@ my $dbname = "dbi:SQLite:dbname=$dbfile";
 my $dbcon = DBI->connect($dbname,"","");
 my $count = 0;
 my $step = 100;
-my $query = "SELECT * FROM pebble ORDER BY hearts DESC LIMIT 10";
 
 sub GetAll{
     my ($base,$url) = @_;
@@ -82,15 +83,15 @@ sub UpdateDb {
     $dbcon->do('CREATE INDEX "id" on pebble (id ASC)');
     $dbcon->do('CREATE INDEX "type" on pebble (type ASC)');
 
-    print "get apps\n";
+    print "downloading apps\n";
     GetAll($appurl);
     $count = 0;
-    print "get faces\n";
+    print "downloading faces\n";
     GetAll($faceurl);
 }
 
 sub PrintEntry {
-    my ($entry) = @_;
+    my ($entry,$width) = @_;
     my $str = " " . $entry->{"hearts"} . "\t" . $entry->{"title"} . " (" . $entry->{"author"} . ")" . "\n";
     if ($entry->{"type"} eq "watchface") {
         $str = "W" . $str;
@@ -98,12 +99,71 @@ sub PrintEntry {
         $str = "A" . $str;
     }
     print encode("utf-8",$str);
+    my $desc = $entry->{'description'};
+    $desc =~ s/^[ \t]*//;
+    $desc =~ s/\n.*//g;
+    if (length($desc) > $width) {
+        $desc = substr($desc,0,$width) . '...';
+    } else {
+        $desc = substr($desc,0,$width);
+    }
+    print "\t\t" . $desc . "\n";
 }
 
-my $sth = $dbcon->prepare($query);
-$sth->execute();
-while (my $row = $sth->fetchrow_hashref) {
-    PrintEntry($row);
+sub Search {
+    my ($query,$string,$column) = @_;
+    $string =~ s/[^a-zA-Z0-9 ]//g;
+    $column =~ s/[^a-zA-Z]//g;
+    my $ins = " $column COLLATE UTF8_GENERAL_CI LIKE \"%$string%\"";
+    if ($query =~ /WHERE/) {
+        $query .= " AND ";
+    } else {
+        $query .= " WHERE ";
+    }
+    return $query . $ins;
+}
+
+my $search;
+my $title;
+my $limit;
+my $update;
+my $help;
+my $description;
+my $width;
+my $order;
+my $orderdir;
+my @columns = ("id", "title", "type", "author", "category", "description", "screenshot", "capabilities", "hearts", "pbw", "created", "updated");
+my $query = "SELECT * FROM pebble";
+GetOptions("s|search" => \$search, "t|title=s" => \$title, "d|description=s" => \$description, "l|limit=i" => \$limit, "u|update" => \$update, "h|help" => \$help, "w|width=i" => \$width, "o|order=s" => \$order, "a|ascending" => \$orderdir);
+$width //= 100;
+
+if (defined $search) {
+    if (defined $title) {
+        $query = Search $query, $title, "title";
+    }
+    if (defined $description) {
+        $query = Search $query, $description, "description";
+    }
+    if ((defined $order) and ($order ~~ @columns)) {
+        $query .= " ORDER BY " . $order;
+        if (defined $orderdir) {
+            $query .= " ASC";
+        } else {
+            $query .= " DESC";
+        }
+    }
+    if ((defined $limit) and ($limit > 0)) {
+        $query .= " LIMIT " . $limit;
+    }
+    my $sth = $dbcon->prepare($query);
+    if (defined $sth) {
+        $sth->execute();
+        while (my $row = $sth->fetchrow_hashref) {
+            PrintEntry $row, $width;
+        }
+    }
+} elsif (defined $update) {
+    UpdateDb;
 }
 
 $dbcon->disconnect;
