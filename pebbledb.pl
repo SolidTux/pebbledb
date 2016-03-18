@@ -6,32 +6,17 @@ use LWP::Simple;
 use JSON;
 use Data::Dumper;
 use DBI;
+use Encode qw(encode decode);
+use Getopt::Long;
 
 my $appurl = "https://api2.getpebble.com/v2/apps/collection/all/watchapps-and-companions";
 my $faceurl = "https://api2.getpebble.com/v2/apps/collection/all/watchfaces";
 my $dbfile = "pebble.db";
 my $dbname = "dbi:SQLite:dbname=$dbfile";
 my $dbcon = DBI->connect($dbname,"","");
-$dbcon->do("DROP TABLE pebble");
-$dbcon->do('CREATE TABLE pebble (
-    "id" TEXT,
-    "title" TEXT,
-    "type" TEXT,
-    "author" TEXT,
-    "category" TEXT,
-    "description" TEXT,
-    "screenshot" TEXT,
-    "capabilities" TEXT,
-    "hearts" INTEGER,
-    "pbw" TEXT,
-    "created" TEXT,
-    "updated" TEXT
-)');
-$dbcon->do('CREATE INDEX "id" on pebble (id ASC)');
-$dbcon->do('CREATE INDEX "type" on pebble (type ASC)');
-
 my $count = 0;
 my $step = 100;
+my $query = "SELECT * FROM pebble ORDER BY hearts DESC LIMIT 10";
 
 sub GetAll{
     my ($base,$url) = @_;
@@ -78,10 +63,47 @@ sub GetAll{
     }
 }
 
-print "get apps\n";
-GetAll($appurl);
-$count = 0;
-print "get faces\n";
-GetAll($faceurl);
+sub UpdateDb {
+    $dbcon->do("DROP TABLE pebble");
+    $dbcon->do('CREATE TABLE pebble (
+        "id" TEXT,
+        "title" TEXT,
+        "type" TEXT,
+        "author" TEXT,
+        "category" TEXT,
+        "description" TEXT,
+        "screenshot" TEXT,
+        "capabilities" TEXT,
+        "hearts" INTEGER,
+        "pbw" TEXT,
+        "created" TEXT,
+        "updated" TEXT
+    )');
+    $dbcon->do('CREATE INDEX "id" on pebble (id ASC)');
+    $dbcon->do('CREATE INDEX "type" on pebble (type ASC)');
+
+    print "get apps\n";
+    GetAll($appurl);
+    $count = 0;
+    print "get faces\n";
+    GetAll($faceurl);
+}
+
+sub PrintEntry {
+    my ($entry) = @_;
+    my $str = " " . $entry->{"hearts"} . "\t" . $entry->{"title"} . " (" . $entry->{"author"} . ")" . "\n";
+    if ($entry->{"type"} eq "watchface") {
+        $str = "W" . $str;
+    } else {
+        $str = "A" . $str;
+    }
+    print encode("utf-8",$str);
+}
+
+my $sth = $dbcon->prepare($query);
+$sth->execute();
+while (my $row = $sth->fetchrow_hashref) {
+    PrintEntry($row);
+}
 
 $dbcon->disconnect;
