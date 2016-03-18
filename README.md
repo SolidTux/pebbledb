@@ -2,6 +2,17 @@
 
 Search Pebble apps and faces using many filter options.
 
+## Requirements
+
+* LWP::Simple and extension for https protocol
+* JSON
+* Data::Dumper
+* DBI
+* Getopt::Long
+* File::Basename
+* File::HomeDir
+* Switch
+
 ## Usage
 
 ./pebbledb.pl [mode] [options]
