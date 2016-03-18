@@ -238,7 +238,7 @@ my @ordcols = ("id", "title", "type", "author", "category", "hearts", "created",
 my @desccols = ("hearts", "created", "updated");
 my @categories = ("Games", "Daily", "Tools & Utilities", "Health & Fitness", "Notifications", "Remotes", "GetSomeApps", "Index", "Faces");
 my $query = "SELECT * FROM pebble";
-GetOptions("s|search" => \$search, "t|title=s" => \$title, "d|description=s" => \$description, "l|limit=i" => \$limit, "u|update" => \$update, "h|help" => \$help, "w|description-width=i" => \$width, "o|order=s" => \$order, "d|order-dir" => \$orderdir, "c|category=s" => \$category, "a|apps" => \$apps, "f|faces" => \$faces, "health" => \$health, "configurable" => \$conf, "location" => \$loc, "no-health" => \$nohealth, "no-location" => \$noloc, "not-configurable" => \$noconf, "download" => \$download, "dates" => \$dates, "url" => \$url);
+GetOptions("s|search" => \$search, "t|title=s" => \$title, "d|description=s" => \$description, "l|limit=i" => \$limit, "u|update" => \$update, "h|help" => \$help, "w|description-width=i" => \$width, "o|order=s" => \$order, "O|order-dir" => \$orderdir, "c|category=s" => \$category, "a|apps" => \$apps, "f|faces" => \$faces, "health" => \$health, "configurable" => \$conf, "location" => \$loc, "no-health" => \$nohealth, "no-location" => \$noloc, "not-configurable" => \$noconf, "download" => \$download, "dates" => \$dates, "url" => \$url);
 $width //= 50;
 $limit //= 20;
 
@@ -357,7 +357,7 @@ OPTIONS (SEARCH MODE ONLY):
         Display first N characters of description.
     -o, --order STR
         Order by STR (id, title, type, author, category, hearts, created, updated).
-    -d, --order-dir STR
+    -O, --order-dir STR
         Sorting direction (asc, desc) (default value depends on column).
     -c, --category STR
         Search in category STR ([G]ames, [D]aily, [T]ools & Utilities, [H]ealth & Fitness,

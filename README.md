@@ -42,7 +42,7 @@ Search Pebble apps and faces using many filter options.
 
     Order by STR (id, title, type, author, category, hearts, created, updated).
 
--d, --order-dir STR
+-O, --order-dir STR
 
     Sorting direction (asc, desc) (default value depends on column).
 
