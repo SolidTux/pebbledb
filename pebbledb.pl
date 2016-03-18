@@ -233,14 +233,16 @@ my $noloc;
 my $download;
 my $dates;
 my $url;
+my $page;
 #my @columns = ("id", "title", "type", "author", "category", "description", "screenshot", "capabilities", "hearts", "pbw", "created", "updated");
 my @ordcols = ("id", "title", "type", "author", "category", "hearts", "created", "updated");
 my @desccols = ("hearts", "created", "updated");
 my @categories = ("Games", "Daily", "Tools & Utilities", "Health & Fitness", "Notifications", "Remotes", "GetSomeApps", "Index", "Faces");
 my $query = "SELECT * FROM pebble";
-GetOptions("s|search" => \$search, "t|title=s" => \$title, "d|description=s" => \$description, "l|limit=i" => \$limit, "u|update" => \$update, "h|help" => \$help, "w|description-width=i" => \$width, "o|order=s" => \$order, "O|order-dir" => \$orderdir, "c|category=s" => \$category, "a|apps" => \$apps, "f|faces" => \$faces, "health" => \$health, "configurable" => \$conf, "location" => \$loc, "no-health" => \$nohealth, "no-location" => \$noloc, "not-configurable" => \$noconf, "download" => \$download, "dates" => \$dates, "url" => \$url);
+GetOptions("s|search" => \$search, "t|title=s" => \$title, "d|description=s" => \$description, "l|limit=i" => \$limit, "u|update" => \$update, "h|help" => \$help, "w|description-width=i" => \$width, "o|order=s" => \$order, "O|order-dir=s" => \$orderdir, "c|category=s" => \$category, "a|apps" => \$apps, "f|faces" => \$faces, "health" => \$health, "configurable" => \$conf, "location" => \$loc, "no-health" => \$nohealth, "no-location" => \$noloc, "not-configurable" => \$noconf, "download" => \$download, "dates" => \$dates, "url" => \$url, "p|page=i" => \$page);
 $width //= 50;
 $limit //= 20;
+$page //= 0;
 
 if (defined $search) {
     if (defined $title) {
@@ -301,17 +303,17 @@ if (defined $search) {
         }
     }
     if ((defined $limit) and ($limit > 0)) {
-        $query .= " LIMIT " . $limit;
+        $query .= " LIMIT " . $limit*$page . ", " . $limit;
     }
     #print "$query\n";
     my $sth = $dbcon->prepare($query);
     if (defined $sth) {
         $sth->execute();
-        my $num = 1;
+        my $num = $limit*$page+1;
         my $downloaded = 0;
         my $downtitle = "";
         while (my $row = $sth->fetchrow_hashref) {
-            if (($num == 1) and (defined $download)) {
+            if (($num == $limit*$page+1) and (defined $download)) {
                 $downtitle = $row->{"title"};
                 if (defined $row->{"pbw"}) {
                     my $fn = $row->{"title"};
@@ -353,6 +355,8 @@ OPTIONS (SEARCH MODE ONLY):
         Search in description for STR.
     -l, --limit N (default 20)
         Limit output to N results. Use 0 to disable this limit.
+    -p, --page N (default 0)
+        View the Nth page of results.
     -w, --description-width N (default 40)
         Display first N characters of description.
     -o, --order STR
