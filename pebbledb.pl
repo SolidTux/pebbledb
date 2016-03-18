@@ -8,15 +8,17 @@ use Data::Dumper;
 use DBI;
 use Getopt::Long;
 use File::Basename;
+use File::HomeDir;
 use Switch;
 
 Getopt::Long::Configure ('bundling');
 
 my $appurl = "https://api2.getpebble.com/v2/apps/collection/all/watchapps-and-companions";
 my $faceurl = "https://api2.getpebble.com/v2/apps/collection/all/watchfaces";
-my $dbfile = "pebble.db";
+my $storeurl = "https://apps.getpebble.com/en_US/application/";
+my $dbfile = File::HomeDir->my_home . "/.pebbledb";
 my $dbname = "dbi:SQLite:dbname=$dbfile";
-my $dbcon = DBI->connect($dbname,"","");
+my $dbcon = DBI->connect($dbname,"","",{PrintError => 0});
 my $count = 0;
 my $step = 100;
 
@@ -92,12 +94,12 @@ sub UpdateDb {
 }
 
 sub PrintEntry {
-    my ($num, $entry,$width) = @_;
-    my $str = $num . ".)" . " " x (5 - length($num)) . $entry->{"hearts"} . " " x (7-length($entry->{"hearts"})) . $entry->{"title"} . " (" . $entry->{"author"} . ")" . "\n";
+    my ($num, $entry,$width,$dates,$url) = @_;
+    my $str = $num . "." . " " x (5 - length($num)) . $entry->{"hearts"} . " " x (7-length($entry->{"hearts"})) . $entry->{"title"} . " (" . $entry->{"author"} . ")";
     #if ($entry->{"type"} eq "companion-app") {
         #$str .= " (companion-app required)";
     #}
-    my $capstr = " " x 6;
+    my $capstr = " " x 5;
     if ($entry->{"type"} eq "watchface") {
         $capstr = "F" . $capstr;
     } else {
@@ -114,7 +116,7 @@ sub PrintEntry {
             $capstr .= "C";
         }
     }
-    print $str . $capstr;
+    print $str . "\n" . $capstr;
     if (defined $entry->{'description'}) {
         my $desc = $entry->{'description'};
         $desc =~ s/^[ \t]*//;
@@ -124,9 +126,27 @@ sub PrintEntry {
         } else {
             $desc = substr($desc,0,$width);
         }
-        print " " x (18 - length($capstr)) . $desc . "\n";
+        print " " x (17 - length($capstr)) . $desc . "\n";
     } else {
         print "\n";
+    }
+    if (defined $dates) {
+        print " " x 17;
+        if (defined $entry->{"created"}) {
+            my $cre = $entry->{"created"};
+            $cre =~ s/T.*//;
+            print "created " . $cre;
+        }
+        if (defined $entry->{"updated"}) {
+            my $upd = $entry->{"updated"};
+            $upd =~ s/T.*//;
+            print " updated: " . $upd;
+        }
+        print "\n";
+    }
+    if ((defined $url) and (defined $entry->{"id"})) {
+        print " " x 17;
+        print $storeurl . $entry->{"id"} . "\n";
     }
 }
 
@@ -211,12 +231,14 @@ my $nohealth;
 my $noconf;
 my $noloc;
 my $download;
+my $dates;
+my $url;
 #my @columns = ("id", "title", "type", "author", "category", "description", "screenshot", "capabilities", "hearts", "pbw", "created", "updated");
 my @ordcols = ("id", "title", "type", "author", "category", "hearts", "created", "updated");
 my @desccols = ("hearts", "created", "updated");
 my @categories = ("Games", "Daily", "Tools & Utilities", "Health & Fitness", "Notifications", "Remotes", "GetSomeApps", "Index", "Faces");
 my $query = "SELECT * FROM pebble";
-GetOptions("s|search" => \$search, "t|title=s" => \$title, "d|description=s" => \$description, "l|limit=i" => \$limit, "u|update" => \$update, "h|help" => \$help, "w|description-width=i" => \$width, "o|order=s" => \$order, "d|order-dir" => \$orderdir, "c|category=s" => \$category, "a|apps" => \$apps, "f|faces" => \$faces, "health" => \$health, "configurable" => \$conf, "location" => \$loc, "no-health" => \$nohealth, "no-location" => \$noloc, "not-configurable" => \$noconf, "download" => \$download);
+GetOptions("s|search" => \$search, "t|title=s" => \$title, "d|description=s" => \$description, "l|limit=i" => \$limit, "u|update" => \$update, "h|help" => \$help, "w|description-width=i" => \$width, "o|order=s" => \$order, "d|order-dir" => \$orderdir, "c|category=s" => \$category, "a|apps" => \$apps, "f|faces" => \$faces, "health" => \$health, "configurable" => \$conf, "location" => \$loc, "no-health" => \$nohealth, "no-location" => \$noloc, "not-configurable" => \$noconf, "download" => \$download, "dates" => \$dates, "url" => \$url);
 $width //= 50;
 $limit //= 20;
 
@@ -286,21 +308,29 @@ if (defined $search) {
     if (defined $sth) {
         $sth->execute();
         my $num = 1;
+        my $downloaded = 0;
+        my $downtitle = "";
         while (my $row = $sth->fetchrow_hashref) {
             if (($num == 1) and (defined $download)) {
+                $downtitle = $row->{"title"};
                 if (defined $row->{"pbw"}) {
                     my $fn = $row->{"title"};
                     $fn =~ s/[ \t]+/_/g;
                     $fn =~ s/^_//;
                     $fn =~ s/[^a-zA-Z0-9_]*//g;
                     getstore($row->{"pbw"},$fn . ".pbw");
-                    print "Download of " . $row->{"title"} . " finished.\n";
+                    $downloaded = 1;
                 } else {
-                    print "No Information about PBW file of " . $row->{"title"} . "\n";
+                    $downloaded = 2;
                 }
             }
-            PrintEntry $num, $row, $width;
+            PrintEntry $num, $row, $width, $dates, $url;
             $num++;
+        }
+        if ($downloaded == 1) {
+            print "Download of " . $downtitle . " finished.\n";
+        } elsif ($downloaded == 2) {
+            print "No Information about PBW file of " . $downtitle . "\n";
         }
     }
 } elsif (defined $update) {
@@ -323,14 +353,16 @@ OPTIONS (SEARCH MODE ONLY):
         Search in description for STR.
     -l, --limit N (default 20)
         Limit output to N results. Use 0 to disable this limit.
-    -w, --description-width N
-        Display first N characters of description (default 40)
+    -w, --description-width N (default 40)
+        Display first N characters of description.
     -o, --order STR
         Order by STR (id, title, type, author, category, hearts, created, updated).
     -d, --order-dir STR
         Sorting direction (asc, desc) (default value depends on column).
     -c, --category STR
-        Search in category STR ([G]ames, [D]aily, [T]ools & Utilities, [H]ealth & Fitness, [N]otifications, [R]emotes, Get[S]omeApps, [I]ndex). This option will only work for watchapps there is no category information for watchfaces.
+        Search in category STR ([G]ames, [D]aily, [T]ools & Utilities, [H]ealth & Fitness,
+        [N]otifications, [R]emotes, Get[S]omeApps, [I]ndex). This option will only work
+        for watchapps as there is no category information for watchfaces.
     -a, --apps
         Display only watchapps.
     -f, --faces
@@ -341,6 +373,10 @@ OPTIONS (SEARCH MODE ONLY):
         Display only (not) configurable watchapps or watch faces.
     --location (--no-location)
         Display only watchapps or watchfaces which (don't) use location access.
+    --dates
+        Display date of last update and creation.
+    --url
+        Display links to the application page.
     --download
         Download PBW file of first result to file.
 
